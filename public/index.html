@@ -1,0 +1,170 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+</head>
+
+
+<body>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.2/jquery.min.js"></script>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.4/underscore-min.js"></script>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/mustache.js/0.7.2/mustache.min.js"></script>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.0.0/backbone-min.js"></script>
+
+  <div class='container'>
+    <h1>HEllo</h1>
+
+    <div class='page'>
+      <script type='text/mustache' id='users-list'>
+      <a href='#/new'>Make new person</a>
+      <table>
+      <tr>
+      <td>firstname</td>
+      <td>lastname</td>
+      <td>age</td>
+      {{#users}}
+      {{#attributes}}
+      <tr>
+      <td>{{firstname}}</td>
+      <td>{{lastname}}</td>
+      <td>{{age}}</td>
+      <td><a href="#/edit/{{&id}}">Edit User</a></td>
+      </tr>
+      {{/attributes}}
+      {{/users}}
+      <table>
+      </script>
+    </div>
+
+    <script type='text/mustache' class='form-template'>
+    <form class='user-form'>
+      <input type='text' name='firstname' value="{{&user.firstname}}"></br>
+      <input type='text' name='lastname' value="{{&user.lastname}}"></br>
+      <input type='text' name='age' value="{{&user.age}}"></br>
+      {{#user}}
+        <input type='hidden' name='id' value="{{&user.id}}">
+        <button type='button' class='delete-user-button'>Delete</button>
+      {{/user}}
+      <input type='submit'>
+    </form>
+    </script>
+
+  </div>
+
+
+  <script>
+    $.ajaxPrefilter( function( options, originalOptions, jqXHR ) {
+      options.url = 'http://backbonejs-beginner.herokuapp.com' + options.url
+    })
+
+    $.fn.serializeObject = function() {
+      var o = {};
+      var a = this.serializeArray();
+      $.each(a, function() {
+        if (o[this.name] !== undefined) {
+          if (!o[this.name].push) {
+            o[this.name] = [o[this.name]];
+          }
+        o[this.name].push(this.value || '');
+        }
+        else {
+          o[this.name] = this.value || '';
+        }
+      });
+      return o;
+    };
+
+    var User = Backbone.Model.extend({
+      urlRoot: '/users'
+    })
+
+    var Users = Backbone.Collection.extend({
+      url: '/users'
+    })
+
+    var UserList = Backbone.View.extend({
+      el: '.page',
+      render: function(){
+        var _this = this
+        var users = new Users()
+        users.fetch({
+          success: function(usersData){
+            var data = {users: usersData.models}
+            var mustacheTemplate = $("#users-list").html()
+            var output = Mustache.render(mustacheTemplate, data)
+            console.log(data)
+            _this.$el.html(output)
+          }
+        })
+      }
+    })
+
+    var EditUser = Backbone.View.extend({
+      el: '.page',
+      events: {
+        'submit .user-form': 'saveUser',
+        'click .delete-user-button': 'deleteUser'
+      },
+      render: function(options){
+        var _this = this
+        if (options.id) {
+          _this.user = new User({id: options.id})
+          _this.user.fetch({
+            success: function(user){
+              console.log(user)
+              var userInfo = user.attributes
+              var template = Mustache.render($('.form-template').html(), {user: userInfo})
+              _this.$el.html(template)
+            }
+          })
+        }
+        else {
+          var template = Mustache.render($('.form-template').html(), {})
+          _this.$el.html(template)
+        }
+      },
+      saveUser: function(event){
+        event.preventDefault();
+        var userInfo = $(event.currentTarget).serializeObject()
+        var user = new User()
+        user.save(userInfo, {
+          success: function(){
+            router.navigate('', {trigger: true})
+          }
+        })
+      },
+      deleteUser: function(event){
+        event.preventDefault()
+        this.user.destroy({
+          success: function(){
+            router.navigate('', {trigger: true})
+          }
+        })
+      }
+    })
+
+    var Router = Backbone.Router.extend({
+      routes: {
+        '': 'home',
+        'new' : 'editUser',
+        'edit/:id' : 'editUser'
+      }
+    })
+
+    userListView = new UserList()
+    editUserView = new EditUser()
+    var router = new Router()
+    Backbone.history.start()
+
+    router.on('route:home', function(){
+      userListView.render()
+    })
+
+    router.on('route:editUser', function(id){
+      editUserView.render({id: id})
+    })
+
+
+  </script>
+
+</body>
+</html>
